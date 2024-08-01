@@ -18,7 +18,7 @@ default_args = {
     schedule='@weekly',
     catchup=False,
     tags=['notaries'],
-    default_args=default_args
+    # default_args=default_args
 )
 def notaries():
     scrap_notaries = PythonOperator(

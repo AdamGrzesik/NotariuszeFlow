@@ -1,21 +1,13 @@
+import random
+
 import requests
-from airflow.hooks.base import BaseHook
-from bs4 import BeautifulSoup
-from minio import Minio
 import time
 import csv
 import logging
 
+from bs4 import BeautifulSoup
 
-def get_minio_client():
-    minio = BaseHook.get_connection('minio')
-    client = Minio(
-        endpoint=minio.extra_dejson['endpoint_url'].split('//')[1],
-        access_key=minio.login,
-        secret_key=minio.password,
-        secure=False
-    )
-    return client
+from include.utils.minio import get_minio_client
 
 
 def scrap_all_notaries():
@@ -32,8 +24,9 @@ def scrap_all_notaries():
         writer.writerow(['Name', 'Address 1', 'Address 2', 'Address 3', 'Detail Link', 'Phone Number', 'Email'])
 
         page = 0
-        while page <= 564:
+        while page <= 10:
             search_url = search_url_template + str(page)
+
             response = requests.get(search_url)
             soup = BeautifulSoup(response.content, 'html.parser')
 
@@ -69,7 +62,7 @@ def scrap_all_notaries():
                 writer.writerow([notary_name, address, city, capital_city, notary_link, phone_number, email])
                 print(f'Wrote raw data for {notary_name} to the CSV file.')
 
-            time.sleep(10)
+            time.sleep(random.randint(10, 20))
             page += 1
 
     try:
@@ -103,11 +96,7 @@ def transform_notaries_data():
                 writer.writerow(
                     ['First Name', 'Secondary Name', 'Last Name', 'Address', 'City', 'Capital City', 'Phone Number',
                      'Email'])
-
                 for row in reader:
-                    if len(row) != 7:
-                        logging.error(f'Skipping row with unexpected number of columns: {row}')
-                        continue
 
                     notary_name, address, city, capital_city, notary_link, phone_number, email = row
 
@@ -126,4 +115,4 @@ def transform_notaries_data():
         client.fput_object(bucket_name, transformed_object_name, transformed_csv_file_path)
         print(f'Uploaded {transformed_csv_file_path} to Minio bucket {bucket_name} as {transformed_object_name}')
     except Exception as e:
-        logging.error(f'Error processing file: {e}')
+        raise ValueError(f'Error processing file: {e}')
