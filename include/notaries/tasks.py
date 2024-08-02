@@ -1,13 +1,12 @@
-import random
-
-import requests
 import time
 import csv
 import logging
+import pandas as pd
 
 from bs4 import BeautifulSoup
 
 from include.utils.minio import get_minio_client
+from include.utils.try_request import try_request
 
 
 def scrap_all_notaries():
@@ -17,23 +16,23 @@ def scrap_all_notaries():
     bucket_name = 'notaries-bucket'
     raw_object_name = 'raw_notaries.csv'
 
-    # Open CSV file in write mode with delimiter ;
     with open(raw_csv_file_path, mode='w', newline='', encoding='utf-8') as file:
         writer = csv.writer(file, delimiter=';')
-        # Write the header
+
         writer.writerow(['Name', 'Address 1', 'Address 2', 'Address 3', 'Detail Link', 'Phone Number', 'Email'])
 
         page = 0
-        while page <= 10:
+        while page < 10:
             search_url = search_url_template + str(page)
 
-            response = requests.get(search_url)
+            response = try_request(search_url, 10)
             soup = BeautifulSoup(response.content, 'html.parser')
 
             notary_names = soup.find_all(class_='notary-name')
             addresses = soup.find_all(class_='address-notary')
             links = soup.find_all(class_='btn notary-detail-link')
 
+            # Testing...
             if not notary_names:
                 break
 
@@ -42,8 +41,7 @@ def scrap_all_notaries():
                 notary_address = address.get_text(strip=True)
                 notary_link = base_url + link['href']
 
-                # Fetch the notary's detail page
-                detail_response = requests.get(notary_link)
+                detail_response = try_request(notary_link, 10)
                 detail_soup = BeautifulSoup(detail_response.content, 'html.parser')
 
                 # Extract phone number and email
@@ -58,12 +56,16 @@ def scrap_all_notaries():
                 city = address_parts[1].strip() if len(address_parts) > 1 else ''
                 capital_city = address_parts[2].strip() if len(address_parts) > 2 else ''
 
-                # Write the raw notary details to the CSV file
                 writer.writerow([notary_name, address, city, capital_city, notary_link, phone_number, email])
                 print(f'Wrote raw data for {notary_name} to the CSV file.')
 
-            time.sleep(random.randint(10, 20))
+                time.sleep(3)
+
             page += 1
+
+            if page % 100 == 0:
+                print('Waiting to prevent too many requests...')
+                time.sleep(300)
 
     try:
         client = get_minio_client()
@@ -74,6 +76,7 @@ def scrap_all_notaries():
         print(f'Uploaded {raw_csv_file_path} to Minio bucket {bucket_name} as {raw_object_name}')
     except Exception as e:
         logging.error(f'Error uploading file to Minio: {e}')
+        raise
 
 
 def transform_notaries_data():
@@ -87,32 +90,26 @@ def transform_notaries_data():
         client.fget_object(bucket_name, raw_object_name, transformed_csv_file_path)
         print(f'Downloaded {raw_object_name} from Minio bucket {bucket_name}')
 
-        with open(transformed_csv_file_path, mode='r', newline='', encoding='utf-8') as raw_file:
-            reader = csv.reader(raw_file, delimiter=';')
-            header = next(reader)
+        df = pd.read_csv(transformed_csv_file_path, delimiter=';')
 
-            with open(transformed_csv_file_path, mode='w', newline='', encoding='utf-8') as transformed_file:
-                writer = csv.writer(transformed_file, delimiter=';')
-                writer.writerow(
-                    ['First Name', 'Secondary Name', 'Last Name', 'Address', 'City', 'Capital City', 'Phone Number',
-                     'Email'])
-                for row in reader:
+        # Split the notary name into parts and transform the data
+        def split_name(name):
+            name_parts = name.split()
+            first_name = name_parts[0]
+            last_name = name_parts[-1]
+            secondary_name = name_parts[1] if len(name_parts) == 3 else None
+            return pd.Series([first_name, secondary_name, last_name])
 
-                    notary_name, address, city, capital_city, notary_link, phone_number, email = row
+        df[['First Name', 'Secondary Name', 'Last Name']] = df['Name'].apply(split_name)
+        df = df.rename(columns={'Address 1': 'Address', 'Address 2': 'City', 'Address 3': 'Capital City'})
+        df = df[
+            ['First Name', 'Secondary Name', 'Last Name', 'Address', 'City', 'Capital City', 'Phone Number', 'Email']]
 
-                    # Split the notary name into parts
-                    name_parts = notary_name.split()
-                    first_name = name_parts[0]
-                    last_name = name_parts[-1]
-                    secondary_name = name_parts[1] if len(name_parts) == 3 else None
+        df.to_csv(transformed_csv_file_path, sep=';', index=False)
+        print(f'Wrote transformed data to {transformed_csv_file_path}')
 
-                    # Write the transformed notary details to the CSV file
-                    writer.writerow(
-                        [first_name, secondary_name, last_name, address, city, capital_city, phone_number, email])
-                    print(f'Wrote transformed data for {first_name} {last_name} to the CSV file.')
-
-        # Upload the transformed CSV file to Minio
         client.fput_object(bucket_name, transformed_object_name, transformed_csv_file_path)
         print(f'Uploaded {transformed_csv_file_path} to Minio bucket {bucket_name} as {transformed_object_name}')
     except Exception as e:
-        raise ValueError(f'Error processing file: {e}')
+        logging.error(f'Error processing file: {e}')
+        raise

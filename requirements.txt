@@ -1,3 +1,7 @@
 # Astro Runtime includes the following pre-installed providers packages: https://docs.astronomer.io/astro/runtime-image-architecture#provider-packages
 beautifulsoup4==4.12.3
 minio==7.1.14
+requests==2.31.0
+pendulum==3.0.0
+pytest==7.4.4
+pandas==2.1.4
