@@ -6,6 +6,7 @@ import pandas as pd
 from bs4 import BeautifulSoup
 
 from include.utils.minio import get_minio_client
+from include.utils.transform import split_name, split_address
 from include.utils.try_request import try_request
 
 
@@ -19,48 +20,42 @@ def scrap_all_notaries():
     with open(raw_csv_file_path, mode='w', newline='', encoding='utf-8') as file:
         writer = csv.writer(file, delimiter=';')
 
-        writer.writerow(['Name', 'Address 1', 'Address 2', 'Address 3', 'Detail Link', 'Phone Number', 'Email'])
+        writer.writerow(['Name', 'Address', 'Detail Link', 'Phone Number', 'Fax Number', 'Email'])
 
         page = 0
-        while page < 10:
+        while True:
             search_url = search_url_template + str(page)
 
             response = try_request(search_url, 10)
             soup = BeautifulSoup(response.content, 'html.parser')
 
-            notary_names = soup.find_all(class_='notary-name')
-            addresses = soup.find_all(class_='address-notary')
             links = soup.find_all(class_='btn notary-detail-link')
 
-            # Testing...
-            if not notary_names:
+            if not links:
                 break
 
-            for name, address, link in zip(notary_names, addresses, links):
-                notary_name = name.get_text(strip=True)
-                notary_address = address.get_text(strip=True)
+            for link in links:
                 notary_link = base_url + link['href']
 
                 detail_response = try_request(notary_link, 10)
                 detail_soup = BeautifulSoup(detail_response.content, 'html.parser')
 
-                # Extract phone number and email
-                phone_number = detail_soup.find(class_='info-with-icon phone').get_text(strip=True)
-                email = detail_soup.find(class_='info-with-icon link-redirect mail').get_text(strip=True)
+                # Extract info
+                notary_name = detail_soup.find(class_='title').get_text().replace('\n', ' ').strip()
+                notary_address = detail_soup.find(class_='info-with-icon address').get_text().replace('<br>',
+                                                                                                      ' ').strip()
+                phone_number = detail_soup.find(class_='info-with-icon phone')
+                phone_number = phone_number.get_text(strip=True) if phone_number else None
+                fax_number = detail_soup.find(class_='info-with-icon fax')
+                fax_number = fax_number.get_text(strip=True) if fax_number else None
+                email = detail_soup.find(class_='info-with-icon link-redirect mail')
+                email = email.get_text(strip=True) if email else None
 
-                # Subtract address from name
-                notary_name = notary_name.replace(notary_address, '').strip()
-
-                address_parts = notary_address.split(',')
-                address = address_parts[0].strip()
-                city = address_parts[1].strip() if len(address_parts) > 1 else ''
-                capital_city = address_parts[2].strip() if len(address_parts) > 2 else ''
-
-                writer.writerow([notary_name, address, city, capital_city, notary_link, phone_number, email])
+                writer.writerow([notary_name, notary_address, notary_link, phone_number, fax_number, email])
                 print(f'Wrote raw data for {notary_name} to the CSV file.')
 
                 time.sleep(3)
-
+            print(page)
             page += 1
 
             if page % 100 == 0:
@@ -92,18 +87,10 @@ def transform_notaries_data():
 
         df = pd.read_csv(transformed_csv_file_path, delimiter=';')
 
-        # Split the notary name into parts and transform the data
-        def split_name(name):
-            name_parts = name.split()
-            first_name = name_parts[0]
-            last_name = name_parts[-1]
-            secondary_name = name_parts[1] if len(name_parts) == 3 else None
-            return pd.Series([first_name, secondary_name, last_name])
-
         df[['First Name', 'Secondary Name', 'Last Name']] = df['Name'].apply(split_name)
-        df = df.rename(columns={'Address 1': 'Address', 'Address 2': 'City', 'Address 3': 'Capital City'})
-        df = df[
-            ['First Name', 'Secondary Name', 'Last Name', 'Address', 'City', 'Capital City', 'Phone Number', 'Email']]
+        df[['Address', 'Zip Code', 'City', 'Regional Capital']] = df['Address'].apply(split_address)
+        df = df[['First Name', 'Secondary Name', 'Last Name', 'Address', 'Zip Code', 'City', 'Regional Capital',
+                 'Phone Number', 'Fax Number', 'Email']]
 
         df.to_csv(transformed_csv_file_path, sep=';', index=False)
         print(f'Wrote transformed data to {transformed_csv_file_path}')
