@@ -100,3 +100,31 @@ def transform_notaries_data():
     except Exception as e:
         logging.error(f'Error processing file: {e}')
         raise
+
+
+def prepare_for_db_upload():
+    bucket_name = 'notaries-bucket'
+    raw_object_name = 'transformed_notaries.csv'
+    local_csv_file_path = 'transformed_notaries.csv'
+    new_csv_file_path = 'transformed_notaries_comma.csv'
+    new_object_name = 'loading_into_db/transformed_notaries_comma.csv'
+
+    try:
+        # Download the file from Minio
+        client = get_minio_client()
+        client.fget_object(bucket_name, raw_object_name, local_csv_file_path)
+        print(f'Downloaded {raw_object_name} from Minio bucket {bucket_name}')
+
+        # Read the CSV file with the original delimiter
+        df = pd.read_csv(local_csv_file_path, delimiter=';')
+
+        # Save the CSV file with the new delimiter
+        df.to_csv(new_csv_file_path, sep=',', index=False)
+        print(f'Wrote transformed data to {new_csv_file_path} with comma delimiter')
+
+        # Upload the new file to Minio under the specified folder
+        client.fput_object(bucket_name, new_object_name, new_csv_file_path)
+        print(f'Uploaded {new_csv_file_path} to Minio bucket {bucket_name} as {new_object_name}')
+    except Exception as e:
+        logging.error(f'Error processing file: {e}')
+        raise
