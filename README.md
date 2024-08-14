@@ -1,48 +1,39 @@
-Overview
+Wymagania
 ========
 
-Welcome to Astronomer! This project was generated after you ran 'astro dev init' using the Astronomer CLI. This readme describes the contents of the project, as well as how to run Apache Airflow on your local machine.
+Do poprawnego działania projektu wymagany jest Docker oraz Astro CLI.
 
-Project Contents
+Zawartość projektu
 ================
 
-Your Astro project contains the following files and folders:
+Projekt Astro zawiera następujące pliki i foldery:
 
-- dags: This folder contains the Python files for your Airflow DAGs. By default, this directory includes one example DAG:
-    - `example_astronauts`: This DAG shows a simple ETL pipeline example that queries the list of astronauts currently in space from the Open Notify API and prints a statement for each astronaut. The DAG uses the TaskFlow API to define tasks in Python, and dynamic task mapping to dynamically print a statement for each astronaut. For more on how this DAG works, see our [Getting started tutorial](https://docs.astronomer.io/learn/get-started-with-airflow).
-- Dockerfile: This file contains a versioned Astro Runtime Docker image that provides a differentiated Airflow experience. If you want to execute other commands or overrides at runtime, specify them here.
-- include: This folder contains any additional files that you want to include as part of your project. It is empty by default.
-- packages.txt: Install OS-level packages needed for your project by adding them to this file. It is empty by default.
-- requirements.txt: Install Python packages needed for your project by adding them to this file. It is empty by default.
-- plugins: Add custom or community plugins for your project to this file. It is empty by default.
-- airflow_settings.yaml: Use this local-only file to specify Airflow Connections, Variables, and Pools instead of entering them in the Airflow UI as you develop DAGs in this project.
+- dags: Ten folder zawiera pliki Pythona dla DAGów Airflow:
+    - `example_astronauts`: Ten DAG pokazuje prosty przykład potoku ETL, który odpytuje listę astronautów znajdujących się obecnie w kosmosie z Open Notify API i drukuje oświadczenie dla każdego astronauty. DAG wykorzystuje interfejs API TaskFlow do definiowania zadań w Pythonie i dynamicznego mapowania zadań w celu dynamicznego drukowania instrukcji dla każdego astronauty. Więcej informacji na temat działania tego DAG można znaleźć w naszym samouczku [Pierwsze kroki] (https://docs.astronomer.io/learn/get-started-with-airflow).
+    - `notaries`: Właściwy DAG dla projektu. Pobiera, transoformuje oraz ładuje dane do wskazanej w połączeniach bazy.
+- Dockerfile: Ten plik zawiera wersjonowany obraz Astro Runtime Docker, który zapewnia zróżnicowane środowisko Airflow. Jeśli chcesz wykonać inne polecenia lub nadpisania w czasie wykonywania, określ je tutaj.
+- include: Ten folder zawiera wszelkie dodatkowe pliki, które chcesz dołączyć jako część swojego projektu.
+- packages.txt: Zainstaluj pakiety na poziomie systemu operacyjnego potrzebne do projektu, dodając je do tego pliku.
+- requirements.txt: Zainstaluj pakiety Pythona potrzebne do projektu, dodając je do tego pliku.
+- plugins: Dodaj niestandardowe lub społecznościowe wtyczki dla swojego projektu do tego pliku.
 
-Deploy Your Project Locally
+Hostowanie projektu lokalnie
 ===========================
 
-1. Start Airflow on your local machine by running 'astro dev start'.
+1. Uruchom Airflow na lokalnym komputerze, uruchamiając "astro dev start".
 
-This command will spin up 4 Docker containers on your machine, each for a different Airflow component:
+To polecenie uruchomi 5 kontenerów Docker na komputerze, każdy dla innego komponentu Airflow:
 
-- Postgres: Airflow's Metadata Database
-- Webserver: The Airflow component responsible for rendering the Airflow UI
-- Scheduler: The Airflow component responsible for monitoring and triggering tasks
-- Triggerer: The Airflow component responsible for triggering deferred tasks
+- Postgres: Baza danych metadanych Airflow
+- Webserver: Komponent Airflow odpowiedzialny za renderowanie interfejsu użytkownika Airflow
+- Scheduler: Komponent Airflow odpowiedzialny za monitorowanie i wyzwalanie zadań
+- Triggerer: Komponent Airflow odpowiedzialny za wyzwalanie odroczonych zadań
+- MinIO: System przechowywania plików
 
-2. Verify that all 4 Docker containers were created by running 'docker ps'.
+2. Sprawdź, czy wszystkie 5 kontenerów Docker zostały poprawnie utworzone, uruchamiając "docker ps".
 
-Note: Running 'astro dev start' will start your project with the Airflow Webserver exposed at port 8080 and Postgres exposed at port 5432. If you already have either of those ports allocated, you can either [stop your existing Docker containers or change the port](https://docs.astronomer.io/astro/test-and-troubleshoot-locally#ports-are-not-available).
+Uwaga: Uruchomienie "astro dev start" uruchomi projekt z serwerem internetowym Airflow na porcie 8080, Postgres na porcie 5432 i MinIO na porcie 9001. Jeśli masz już przydzielony jeden z tych portów, możesz zatrzymać istniejące kontenery Docker lub zmienić port. (https://docs.astronomer.io/astro/test-and-troubleshoot-locally#ports-are-not-available).
 
-3. Access the Airflow UI for your local Airflow project. To do so, go to http://localhost:8080/ and log in with 'admin' for both your Username and Password.
+3. Przejdź do interfejsu użytkownika dla lokalnego projektu Airflow. Aby to zrobić, przejdź do http://localhost:8080/ i zaloguj się za pomocą "admin" zarówno jako nazwy użytkownika, jak i hasła.
 
-You should also be able to access your Postgres Database at 'localhost:5432/postgres'.
-
-Deploy Your Project to Astronomer
-=================================
-
-If you have an Astronomer account, pushing code to a Deployment on Astronomer is simple. For deploying instructions, refer to Astronomer documentation: https://docs.astronomer.io/cloud/deploy-code/
-
-Contact
-=======
-
-The Astronomer CLI is maintained with love by the Astronomer team. To report a bug or suggest a change, reach out to our support.
+Powinieneś także mieć dostęp do swojej bazy danych Postgres pod adresem "localhost:5432/postgres".
