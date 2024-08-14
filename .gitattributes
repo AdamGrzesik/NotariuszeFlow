@@ -1,1 +1,2 @@
-*.* linguist-language=python
+*.meta linguist-documentation
+*.1 linguist-documentation
